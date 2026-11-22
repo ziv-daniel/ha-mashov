@@ -31,6 +31,7 @@ import voluptuous as vol  # type: ignore
 
 from .additional_data import CONF_ADDITIONAL_DATA, STUDENT_RESOURCES
 from .const import (
+    ACCOUNT_DEVICE_PREFIXES,
     CONF_API_BASE,
     CONF_HOMEWORK_DAYS_BACK,
     CONF_HOMEWORK_DAYS_FORWARD,
@@ -59,17 +60,22 @@ from .data_schedule import (
     CONF_DATA_SCHEDULES,
     CONF_STUDENT_SCHEDULES,
     DATA_SCHEDULES_SCHEMA,
+    SHARED_DATA,
     STUDENT_SCHEDULES_SCHEMA,
     merge_partial_data,
     schedule_groups,
     student_schedule_groups,
 )
 from .data_selection import (
+    CONF_ALLOW_WRITE_ACTIONS,
     CONF_ENABLED_DATA,
     CONF_MAILBOX_FULL_CONTENT,
     CONF_MAILBOX_LIMIT,
+    CONF_SCHOOL_ACTIVITIES_LIMIT,
     DATA_KEYS,
     DEFAULT_MAILBOX_LIMIT,
+    DEFAULT_SCHOOL_ACTIVITIES_LIMIT,
+    SCHOOL_ACTIVITY_DISPLAY_DEFAULTS,
     cached_selection,
     enabled_data,
     filter_cached_data,
@@ -84,6 +90,7 @@ from .mashov_client import (
     configured_school_year,
 )
 from .reporting import is_internal_error, issue_report_url, technical_log
+from .school_activities import ANSWER_SCHEMA, async_handle_answer
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -244,6 +251,9 @@ SET_OPTIONS_SCHEMA = vol.Schema(
         vol.Optional(CONF_ENABLED_DATA): vol.All(cv.ensure_list, [vol.In(DATA_KEYS)]),
         vol.Optional(CONF_MAILBOX_FULL_CONTENT): cv.boolean,
         vol.Optional(CONF_MAILBOX_LIMIT): _int_in(1, 50),
+        vol.Optional(CONF_SCHOOL_ACTIVITIES_LIMIT): _int_in(1, 50),
+        **{vol.Optional(key): cv.boolean for key in SCHOOL_ACTIVITY_DISPLAY_DEFAULTS},
+        vol.Optional(CONF_ALLOW_WRITE_ACTIONS): cv.boolean,
         vol.Optional(CONF_SCHEDULE_TYPE): vol.In(["daily", "weekly", "interval"]),
         vol.Optional(CONF_SCHEDULE_TIME): vol.Match(r"^([01]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$"),
         vol.Optional(CONF_SCHEDULE_DAY): _int_in(0, 6),
@@ -339,6 +349,10 @@ def _async_register_services(hass: HomeAssistant) -> None:
             CONF_ENABLED_DATA, enabled_data(entry.options)
         ):
             raise ServiceValidationError("Select mailbox before enabling full content (which marks messages read)")
+        if payload.get(CONF_ALLOW_WRITE_ACTIONS) and "school_activities" not in payload.get(
+            CONF_ENABLED_DATA, enabled_data(entry.options)
+        ):
+            raise ServiceValidationError("Select school activities before allowing actions in Mashov")
         if "mcp_enabled" in payload:
             user = await hass.auth.async_get_user(call.context.user_id) if call.context.user_id else None
             if user is None or not user.is_admin:
@@ -369,6 +383,14 @@ def _async_register_services(hass: HomeAssistant) -> None:
         _handle_create_live_dashboard,
         schema=CREATE_LIVE_DASHBOARD_SCHEMA,
         supports_response=SupportsResponse.OPTIONAL,
+    )
+
+    async def _handle_answer_school_activity(call: ServiceCall):
+        await async_handle_answer(hass, call)
+
+    # Admin-only: the one action that changes data at Mashov (opt-in per hub).
+    async_register_admin_service(
+        hass, DOMAIN, "answer_school_activity", _handle_answer_school_activity, schema=ANSWER_SCHEMA
     )
 
 
@@ -503,6 +525,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         enabled_data=list(enabled_data(entry.options)),
         mailbox_full_content=entry.options.get(CONF_MAILBOX_FULL_CONTENT, False),
         mailbox_limit=entry.options.get(CONF_MAILBOX_LIMIT, DEFAULT_MAILBOX_LIMIT),
+        school_activities_limit=entry.options.get(CONF_SCHOOL_ACTIVITIES_LIMIT, DEFAULT_SCHOOL_ACTIVITIES_LIMIT),
     )
 
     coordinator = MashovCoordinator(hass, client, entry)
@@ -691,6 +714,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             or set(enabled_data(options)) != set(client.enabled_data)
             or bool(options.get(CONF_MAILBOX_FULL_CONTENT, False)) != client.mailbox_full_content
             or options.get(CONF_MAILBOX_LIMIT, DEFAULT_MAILBOX_LIMIT) != client.mailbox_limit
+            or options.get(CONF_SCHOOL_ACTIVITIES_LIMIT, DEFAULT_SCHOOL_ACTIVITIES_LIMIT)
+            != client.school_activities_limit
             or options.get(CONF_HOMEWORK_DAYS_BACK, DEFAULT_HOMEWORK_DAYS_BACK) != client.homework_days_back
             or options.get(CONF_HOMEWORK_DAYS_FORWARD, DEFAULT_HOMEWORK_DAYS_FORWARD) != client.homework_days_forward
             or (options.get(CONF_API_BASE, DEFAULT_API_BASE).rstrip("/") + "/") != client._api_base
@@ -781,7 +806,7 @@ async def async_remove_config_entry_device(
     Without any roster data removal is refused, to avoid deleting active students.
     """
     identifiers = {value for domain, value in device_entry.identifiers if domain == DOMAIN}
-    if not identifiers or any(value.startswith(("holidays_", "mailbox_")) for value in identifiers):
+    if not identifiers or any(value.startswith(ACCOUNT_DEVICE_PREFIXES) for value in identifiers):
         return False
     coordinator = hass.data.get(DOMAIN, {}).get(config_entry.entry_id, {}).get("coordinator")
     data = coordinator.data if coordinator else None
@@ -1052,7 +1077,7 @@ class MashovCoordinator(DataUpdateCoordinator):
             requested = set(keys) & set(enabled_data(self.entry.options))
             if student_data is not None:
                 students = (self.data or {}).get("students", [])
-                for key in set(self.failed_datasets) - {"holidays", "mailbox"}:
+                for key in set(self.failed_datasets) - SHARED_DATA:
                     if isinstance(key, str):
                         self.failed_datasets.remove(key)
                         self.failed_datasets.update((student["id"], key) for student in students)
@@ -1089,7 +1114,7 @@ class MashovCoordinator(DataUpdateCoordinator):
     def _failure_keys(self, requested, student_data=None):
         if student_data is None:
             return set(requested)
-        return (set(requested) & {"holidays", "mailbox"}) | {
+        return (set(requested) & SHARED_DATA) | {
             (sid, key) for sid, keys in student_data.items() for key in keys if key in requested
         }
 
@@ -1156,8 +1181,9 @@ class MashovCoordinator(DataUpdateCoordinator):
                     )
                     if status == "ok":
                         updates[key] = self.last_successful_update
-            if "mailbox" in requested and data.get("mailbox", {}).get("status") == "ok":
-                data["mailbox"]["last_update"] = self.last_successful_update
+            for key in ("mailbox", "school_activities"):
+                if key in requested and data.get(key, {}).get("status") == "ok":
+                    data[key]["last_update"] = self.last_successful_update
             # Holidays come from a separate endpoint that may fail on its own. If it
             # failed, keep the previous holidays (fresh or already cached) and flag
             # them as cached, preserving when they were last actually fetched.

@@ -78,6 +78,37 @@ data:
 
 This replaces the student schedule map, so include all students/overrides you want to retain. Holidays and Mailbox are account/school resources and cannot be student overrides. Disabled sources are never fetched. Short intervals increase portal requests and may produce more login/activity emails.
 
+## `mashov.answer_school_activity`
+
+Answer a parent approval ("אישורי הורים לפעילות") for one student. This is the only Mashov write action of the integration.
+
+```yaml
+action: mashov.answer_school_activity
+data:
+  entry_id: YOUR_ENTRY_ID        # required only when several hubs are loaded
+  activity_id: 12                # from the school activities sensor's items
+  student: STUDENT_ID_OR_SLUG
+  answer: approved               # approved | approved_with_health_conditions | denied
+  remark: ""                     # optional, up to 500 characters
+```
+
+Safety rules:
+
+- Administrators only, and only after **Allow actions in Mashov** (`allow_write_actions`) is enabled for the hub. School activities must be selected; removing them turns the permission off.
+- Refused, with nothing sent: an unknown activity id, a passed answer deadline, an activity with extra questions (or whose questions could not be checked), and a student who is not in the roster or not listed for the activity. Answer those in the portal.
+- It sends the portal's own request: `PUT students/{student}/schoolActivities/{activity}` with the parent account id.
+- After a successful answer, only school activities are refreshed. Logs record the activity id and HTTP status, never names or remarks.
+
+To enable it without the Configure form:
+
+```yaml
+action: mashov.set_options
+data:
+  entry_id: YOUR_ENTRY_ID
+  enabled_data: [homework, school_activities]
+  allow_write_actions: true
+```
+
 ## `mashov.create_live_dashboard`
 
 Build the Mashov Live dashboard into an existing UI dashboard. With no `students` list it includes every child from every hub. The [dashboard script blueprint](dashboard.md) calls this service; you can also call it directly:

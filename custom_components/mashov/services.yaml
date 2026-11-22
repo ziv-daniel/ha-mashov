@@ -140,6 +140,7 @@ set_options:
             - justification_requests
             - special_hours
             - mailbox
+            - school_activities
     data_schedules:
       name: "Schedules by data type"
       description: "Replaces the override map for this hub. Keys are data types; each schedule uses schedule_type, schedule_time, schedule_days and schedule_interval. Omit a type to follow the shared schedule; use {} to reset all overrides. Disabled data is never fetched."
@@ -158,6 +159,34 @@ set_options:
           min: 1
           max: 50
           mode: box
+    school_activities_limit:
+      name: "Recent school activities"
+      description: "At most this many newest activities are fetched (default 20). Each adds two requests per refresh."
+      selector:
+        number:
+          min: 1
+          max: 50
+          mode: box
+    school_activities_show_ended:
+      name: "Show activities that have ended"
+      description: "Display only (default off)."
+      selector:
+        boolean: {}
+    school_activities_hide_answered:
+      name: "Hide answered activities"
+      description: "Display only (default off)."
+      selector:
+        boolean: {}
+    school_activities_newest_first:
+      name: "Newest activities first"
+      description: "Display only (default on)."
+      selector:
+        boolean: {}
+    allow_write_actions:
+      name: "Allow actions in Mashov"
+      description: "Off by default. Lets an administrator answer parent approvals with mashov.answer_school_activity. School activities must be selected."
+      selector:
+        boolean: {}
 
 create_live_dashboard:
   name: "Create Mashov Live dashboard"
@@ -193,3 +222,47 @@ create_live_dashboard:
       default: false
       selector:
         boolean: {}
+
+answer_school_activity:
+  name: "Answer a school activity"
+  description: "Send a parent approval for one student to Mashov. Admin only; requires allow_write_actions. Activities with questions or a passed deadline are refused."
+  fields:
+    entry_id:
+      name: "Hub entry ID"
+      description: "Required when several hubs are loaded."
+      required: false
+      selector:
+        config_entry:
+          integration: mashov
+    activity_id:
+      name: "Activity ID"
+      description: "The id from the items of the Pending activity approvals sensor."
+      required: true
+      selector:
+        number:
+          min: 1
+          mode: box
+    student:
+      name: "Student"
+      description: "Student id or slug."
+      required: true
+      selector:
+        text: {}
+    answer:
+      name: "Answer"
+      description: "approved | approved_with_health_conditions | denied"
+      required: true
+      selector:
+        select:
+          translation_key: school_activity_answer
+          options:
+            - approved
+            - approved_with_health_conditions
+            - denied
+    remark:
+      name: "Remark"
+      description: "Optional note to the school, up to 500 characters."
+      required: false
+      selector:
+        text:
+          multiline: true

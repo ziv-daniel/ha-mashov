@@ -52,5 +52,7 @@ SENSOR_KEY_GRADES = "grades"
 SENSOR_KEY_HOLIDAYS = "holidays"
 
 # --- Device registry metadata ---
+# Identifier prefixes of per-hub (account/school) devices; never student devices.
+ACCOUNT_DEVICE_PREFIXES = ("holidays_", "mailbox_", "school_activities_")
 DEVICE_MANUFACTURER = "Mashov (Unofficial)"
 DEVICE_MODEL = "Mashov Student Data"

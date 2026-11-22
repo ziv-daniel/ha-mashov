@@ -26,12 +26,17 @@ def setup_api(hass):
             "by_slug": {
                 "child": {
                     "source_status": dict.fromkeys(DATA_KEYS, "ok"),
-                    **{key: [{"value": 1}] for key in DATA_KEYS if key not in ("holidays", "mailbox")},
+                    **{
+                        key: [{"value": 1}]
+                        for key in DATA_KEYS
+                        if key not in ("holidays", "mailbox", "school_activities")
+                    },
                 }
             },
             "holidays": [{"name": "Holiday"}],
             "holidays_status": "ok",
             "mailbox": {"items": [{"subject": "Hello", "messages": [{"body": "secret"}]}], "status": "ok"},
+            "school_activities": {"items": [{"id": 1, "title": "Trip"}], "status": "ok"},
         },
     )
     hass.data["mashov"] = {"account": {"coordinator": coordinator}}

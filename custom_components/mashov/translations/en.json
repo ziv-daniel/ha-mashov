@@ -16,12 +16,22 @@
           "schedule_time": "Refresh time (HH:MM or HH:MM:SS)",
           "schedule_days": "Weekdays (0=Mon ... 6=Sun)",
           "schedule_interval": "Interval minutes (interval mode)",
-          "edit_data_schedules": "Edit schedules by data type"
+          "edit_data_schedules": "Edit schedules by data type",
+          "school_activities_limit": "Recent school activities",
+          "school_activities_show_ended": "Show activities that have ended",
+          "school_activities_hide_answered": "Hide answered activities",
+          "school_activities_newest_first": "Newest activities first",
+          "allow_write_actions": "Allow actions in Mashov (answer activity approvals)"
         },
         "data_description": {
           "enabled_data": "Choose only the data you need. Existing hubs retain their previous selection. Warning: an empty selection creates no school-data sensors. Dashboards and blueprints require their corresponding categories to be selected.",
           "mailbox_full_content": "Full message content is off by default. Enabling it marks fetched conversations as read in Mashov, even if you have not opened them yourself.",
-          "mailbox_limit": "Up to 50 recent inbox conversations. Older conversations and attachment files are not fetched."
+          "mailbox_limit": "Up to 50 recent inbox conversations. Older conversations and attachment files are not fetched.",
+          "school_activities_limit": "Up to 50 newest activities. Each activity adds two requests per refresh.",
+          "school_activities_show_ended": "Same as the portal toggle; changes only what the sensor lists.",
+          "school_activities_hide_answered": "Same as the portal toggle; changes only what the sensor lists.",
+          "school_activities_newest_first": "Same as the portal toggle; changes only what the sensor lists.",
+          "allow_write_actions": "Off by default. When on, an administrator can send parent approvals to Mashov with the mashov.answer_school_activity service. Requires School activities."
         },
         "sections": {
           "data": {
@@ -29,12 +39,22 @@
             "data": {
               "enabled_data": "Data to fetch",
               "mailbox_full_content": "Full message content (marks conversations read)",
-              "mailbox_limit": "Recent inbox conversations"
+              "mailbox_limit": "Recent inbox conversations",
+              "school_activities_limit": "Recent school activities",
+              "school_activities_show_ended": "Show activities that have ended",
+              "school_activities_hide_answered": "Hide answered activities",
+              "school_activities_newest_first": "Newest activities first",
+              "allow_write_actions": "Allow actions in Mashov (answer activity approvals)"
             },
             "data_description": {
               "enabled_data": "Choose only the data you need. Existing hubs retain their previous selection. Warning: an empty selection creates no school-data sensors. Dashboards and blueprints require their corresponding categories to be selected.",
               "mailbox_full_content": "Full message content is off by default. Enabling it marks fetched conversations as read in Mashov, even if you have not opened them yourself.",
-              "mailbox_limit": "Up to 50 recent inbox conversations. Older conversations and attachment files are not fetched."
+              "mailbox_limit": "Up to 50 recent inbox conversations. Older conversations and attachment files are not fetched.",
+              "school_activities_limit": "Up to 50 newest activities. Each activity adds two requests per refresh.",
+              "school_activities_show_ended": "Same as the portal toggle; changes only what the sensor lists.",
+              "school_activities_hide_answered": "Same as the portal toggle; changes only what the sensor lists.",
+              "school_activities_newest_first": "Same as the portal toggle; changes only what the sensor lists.",
+              "allow_write_actions": "Off by default. When on, an administrator can send parent approvals to Mashov with the mashov.answer_school_activity service. Requires School activities."
             }
           },
           "refresh": {
@@ -101,7 +121,8 @@
       "cannot_connect": "Cannot reach Mashov.",
       "school_not_found": "No school matched that name.",
       "mailbox_required": "Select Mailbox before enabling full message content.",
-      "invalid_data_schedule": "Enter a valid time (HH:MM[:SS]), interval (5–1440 minutes), and at least one weekday for a weekly schedule."
+      "invalid_data_schedule": "Enter a valid time (HH:MM[:SS]), interval (5–1440 minutes), and at least one weekday for a weekly schedule.",
+      "school_activities_required": "Select School activities before allowing actions in Mashov."
     },
     "abort": {
       "already_configured": "This Mashov account is already configured."
@@ -129,13 +150,23 @@
           "mailbox_full_content": "Full message content (marks conversations read)",
           "mailbox_limit": "Recent inbox conversations",
           "edit_data_schedules": "Edit schedules by data type",
-          "mcp_enabled": "Expose this account to MCP / Assist (read only)"
+          "mcp_enabled": "Expose this account to MCP / Assist (read only)",
+          "school_activities_limit": "Recent school activities",
+          "school_activities_show_ended": "Show activities that have ended",
+          "school_activities_hide_answered": "Hide answered activities",
+          "school_activities_newest_first": "Newest activities first",
+          "allow_write_actions": "Allow actions in Mashov (answer activity approvals)"
         },
         "data_description": {
           "enabled_data": "Choose only the data you need. Existing hubs retain their previous selection. Warning: an empty selection creates no school-data sensors. Dashboards and blueprints require their corresponding categories to be selected.",
           "mailbox_full_content": "Full message content is off by default. Enabling it marks fetched conversations as read in Mashov, even if you have not opened them yourself.",
           "mailbox_limit": "Up to 50 recent inbox conversations. Older conversations and attachment files are not fetched.",
-          "mcp_enabled": "Off by default. Authenticated administrators can read all children in this account, limited to selected data sources. Select the Mashov API in MCP Server settings."
+          "mcp_enabled": "Off by default. Authenticated administrators can read all children in this account, limited to selected data sources. Select the Mashov API in MCP Server settings.",
+          "school_activities_limit": "Up to 50 newest activities. Each activity adds two requests per refresh.",
+          "school_activities_show_ended": "Same as the portal toggle; changes only what the sensor lists.",
+          "school_activities_hide_answered": "Same as the portal toggle; changes only what the sensor lists.",
+          "school_activities_newest_first": "Same as the portal toggle; changes only what the sensor lists.",
+          "allow_write_actions": "Off by default. When on, an administrator can send parent approvals to Mashov with the mashov.answer_school_activity service. Requires School activities."
         },
         "sections": {
           "data": {
@@ -143,12 +174,22 @@
             "data": {
               "enabled_data": "Data to fetch",
               "mailbox_full_content": "Full message content (marks conversations read)",
-              "mailbox_limit": "Recent inbox conversations"
+              "mailbox_limit": "Recent inbox conversations",
+              "school_activities_limit": "Recent school activities",
+              "school_activities_show_ended": "Show activities that have ended",
+              "school_activities_hide_answered": "Hide answered activities",
+              "school_activities_newest_first": "Newest activities first",
+              "allow_write_actions": "Allow actions in Mashov (answer activity approvals)"
             },
             "data_description": {
               "enabled_data": "Choose only the data you need. Existing hubs retain their previous selection. Warning: an empty selection creates no school-data sensors. Dashboards and blueprints require their corresponding categories to be selected.",
               "mailbox_full_content": "Full message content is off by default. Enabling it marks fetched conversations as read in Mashov, even if you have not opened them yourself.",
-              "mailbox_limit": "Up to 50 recent inbox conversations. Older conversations and attachment files are not fetched."
+              "mailbox_limit": "Up to 50 recent inbox conversations. Older conversations and attachment files are not fetched.",
+              "school_activities_limit": "Up to 50 newest activities. Each activity adds two requests per refresh.",
+              "school_activities_show_ended": "Same as the portal toggle; changes only what the sensor lists.",
+              "school_activities_hide_answered": "Same as the portal toggle; changes only what the sensor lists.",
+              "school_activities_newest_first": "Same as the portal toggle; changes only what the sensor lists.",
+              "allow_write_actions": "Off by default. When on, an administrator can send parent approvals to Mashov with the mashov.answer_school_activity service. Requires School activities."
             }
           },
           "refresh": {
@@ -222,7 +263,8 @@
       "invalid_api_url": "Invalid URL (must start with http/https)",
       "already_configured": "This Mashov account is already configured.",
       "mailbox_required": "Select Mailbox before enabling full message content.",
-      "invalid_data_schedule": "Enter a valid time (HH:MM[:SS]), interval (5–1440 minutes), and at least one weekday for a weekly schedule."
+      "invalid_data_schedule": "Enter a valid time (HH:MM[:SS]), interval (5–1440 minutes), and at least one weekday for a weekly schedule.",
+      "school_activities_required": "Select School activities before allowing actions in Mashov."
     }
   },
   "selector": {
@@ -278,7 +320,8 @@
         "student_files": "Student files",
         "justification_requests": "Absence justification requests",
         "special_hours": "Individual lessons",
-        "mailbox": "Mailbox — headers and unread count"
+        "mailbox": "Mailbox — headers and unread count",
+        "school_activities": "School activities — parent approvals"
       }
     },
     "schedule_scope": {
@@ -350,6 +393,13 @@
         "inherit_defaults": "Use existing account defaults",
         "registration_students": "Registration saves initial defaults. After authentication, choose each student here to set their own schedules."
       }
+    },
+    "school_activity_answer": {
+      "options": {
+        "approved": "Approved",
+        "approved_with_health_conditions": "Approved with health conditions",
+        "denied": "Not approved"
+      }
     }
   },
   "entity": {
@@ -407,6 +457,9 @@
       },
       "mailbox": {
         "name": "Unread conversations"
+      },
+      "school_activities": {
+        "name": "Pending activity approvals"
       }
     },
     "calendar": {
@@ -484,6 +537,26 @@
         },
         "data_schedules": {
           "name": "Data schedules"
+        },
+        "school_activities_limit": {
+          "name": "Recent school activities",
+          "description": "Up to 50 newest activities. Each activity adds two requests per refresh."
+        },
+        "school_activities_show_ended": {
+          "name": "Show activities that have ended",
+          "description": "Same as the portal toggle; changes only what the sensor lists."
+        },
+        "school_activities_hide_answered": {
+          "name": "Hide answered activities",
+          "description": "Same as the portal toggle; changes only what the sensor lists."
+        },
+        "school_activities_newest_first": {
+          "name": "Newest activities first",
+          "description": "Same as the portal toggle; changes only what the sensor lists."
+        },
+        "allow_write_actions": {
+          "name": "Allow actions in Mashov (answer activity approvals)",
+          "description": "Off by default. When on, an administrator can send parent approvals to Mashov with the mashov.answer_school_activity service. Requires School activities."
         }
       }
     },
@@ -508,6 +581,32 @@
         "overwrite": {
           "name": "Replace existing content",
           "description": "Replace a dashboard that already has other content, or a built-in dashboard such as the Overview. The previous content is lost."
+        }
+      }
+    },
+    "answer_school_activity": {
+      "name": "Answer a school activity",
+      "description": "Send a parent approval for one student to Mashov. Admin only; requires 'Allow actions in Mashov'. Activities with questions or a passed answer deadline are refused.",
+      "fields": {
+        "entry_id": {
+          "name": "Hub entry ID",
+          "description": "Required when several hubs are loaded."
+        },
+        "activity_id": {
+          "name": "Activity ID",
+          "description": "The id from the items of the Pending activity approvals sensor."
+        },
+        "student": {
+          "name": "Student",
+          "description": "Student id or slug."
+        },
+        "answer": {
+          "name": "Answer",
+          "description": "Approved, approved with health conditions, or not approved."
+        },
+        "remark": {
+          "name": "Remark",
+          "description": "Optional note to the school, up to 500 characters."
         }
       }
     }

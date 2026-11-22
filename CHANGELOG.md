@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+- Opt-in **School activities** data source (parent approvals, "אישורי הורים לפעילות"): one hub sensor counting pending approvals, with each activity's dates, deadline and per-student answers. Read-only GET requests, bounded by `school_activities_limit` (default 20).
+- Options mirroring the portal's list toggles: show ended activities, hide answered activities, newest first.
+- `mashov.answer_school_activity` admin service, gated by the new **Allow actions in Mashov** option (off by default). It refuses activities with questions or a passed deadline and refreshes only school activities afterwards. This is the integration's first write request to Mashov.
+
 ## [1.2.1] - 2026-11-13
 
 ### Fixed

@@ -2,8 +2,10 @@
 
 Handles login (with a cached-session fast path), school lookup, per-student data
 fetching and normalization of the raw API payloads into the snake_case dicts the
-sensors consume. It never submits forms or downloads attachments. The optional
-mailbox full-content GET marks conversations read and requires explicit opt-in.
+sensors consume. It never downloads attachments. The optional mailbox
+full-content GET marks conversations read and requires explicit opt-in. The only
+write request is answering a school activity (``async_answer_school_activity``),
+which the integration sends only when the hub option ``allow_write_actions`` is on.
 
 Failure isolation is deliberate: a school that disables a feature (HTTP 403/404)
 only blanks that one resource for that one student, with a cooldown so we do not
@@ -14,7 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 import json
 import logging
 import time
@@ -29,9 +31,11 @@ from .data_selection import (
     CONF_ADDITIONAL_DATA,
     CONF_ENABLED_DATA,
     DEFAULT_MAILBOX_LIMIT,
+    DEFAULT_SCHOOL_ACTIVITIES_LIMIT,
     enabled_data as resolve_enabled_data,
 )
 from .mailbox import fetch_mailbox
+from .school_activities import fetch_school_activities
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant  # type: ignore[import]  # pyright: ignore[reportMissingImports]
@@ -126,6 +130,7 @@ class MashovClient:
         enabled_data: list[str] | None = None,
         mailbox_full_content: bool = False,
         mailbox_limit: int = DEFAULT_MAILBOX_LIMIT,
+        school_activities_limit: int = DEFAULT_SCHOOL_ACTIVITIES_LIMIT,
     ) -> None:
         # school may be semel int or name string (resolved in async_init)
         self.school_id = int(school_id) if str(school_id).isdigit() else None
@@ -145,6 +150,7 @@ class MashovClient:
         self.additional_data = tuple(key for key in STUDENT_RESOURCES if key in self.enabled_data)
         self.mailbox_full_content = bool(mailbox_full_content and "mailbox" in self.enabled_data)
         self.mailbox_limit = max(1, min(50, int(mailbox_limit)))
+        self.school_activities_limit = max(1, min(50, int(school_activities_limit)))
         # Optional resources: (student_id, resource_key) -> (retry_after_monotonic, last_status)
         self._resource_retry_after: dict[tuple[str, str], tuple[float, str]] = {}
         # Core resources: (student_id, url_key) -> (retry_after_monotonic, consecutive_403_count)
@@ -996,6 +1002,10 @@ class MashovClient:
             result["mailbox"] = await fetch_mailbox(
                 self._fetch_account_json, full_content=self.mailbox_full_content, limit=self.mailbox_limit
             )
+        if "school_activities" in selected:
+            result["school_activities"] = await fetch_school_activities(
+                self._fetch_account_json, limit=self.school_activities_limit, today=datetime.now(UTC).date()
+            )
 
         _LOGGER.debug("Data fetch completed for %d students", len(students))
         return result
@@ -1045,6 +1055,63 @@ class MashovClient:
         except (aiohttp.ClientError, TimeoutError, ValueError):
             _LOGGER.warning("Unable to fetch Mashov account resource %s", key)
             return "fetch_failed", None
+
+    def _parent_user_id(self) -> str | None:
+        """The logged-in parent's id; the portal sends it as the answer's userId."""
+        credential = self._auth_data.get("credential") if isinstance(self._auth_data, dict) else None
+        user_id = credential.get("userId") if isinstance(credential, dict) else None
+        return user_id if isinstance(user_id, str) and user_id else None
+
+    async def _ensure_write_session(self) -> str:
+        """Open/restore a session that can write; returns the parent user id."""
+        if not self._session or self._session.closed:
+            await self.async_open_session()
+        if self._parent_user_id() is None or "X-Csrf-Token" not in self._headers:
+            await self.async_init(None)
+        user_id = self._parent_user_id()
+        if user_id is None:
+            raise MashovError("Mashov did not return the parent account id; the answer was not sent")
+        return user_id
+
+    async def async_answer_school_activity(self, activity_id: int, student_guid: str, answer: int, remark: str = ""):
+        """Send the parent's answer for one student (PUT, same request as the portal)."""
+        user_id = await self._ensure_write_session()
+        url = f"{self._api_base}students/{quote(student_guid, safe='')}/schoolActivities/{int(activity_id)}"
+        body = {
+            "activityId": int(activity_id),
+            "studentGuid": student_guid,
+            "userId": user_id,
+            "answer": answer,
+            "remark": remark or "",
+        }
+        try:
+            for attempt in range(2):
+                async with self._session.put(url, json=body, headers=self._headers) as response:
+                    if response.status == 401 and attempt == 0:
+                        await self._ensure_valid_session()
+                        continue
+                    await self._raise_for_write_status(response)
+                    _LOGGER.info("Answered Mashov school activity %s", activity_id)
+                    return
+        except (aiohttp.ClientError, TimeoutError) as err:
+            _LOGGER.warning("Answering Mashov school activity %s failed: network error", activity_id)
+            raise MashovError("Could not reach Mashov; the answer may not have been sent") from err
+
+    async def _raise_for_write_status(self, response) -> None:
+        """Map a write response to an error without exposing the response body."""
+        if response.status < 400:
+            return
+        _LOGGER.warning("Mashov rejected a school activity answer (HTTP %s)", response.status)
+        if response.status == 401:
+            raise MashovAuthError("Mashov session expired; the answer was not sent")
+        if response.status == 403 and (
+            (response.headers.get("reason") or "").lower() == "changepass"
+            or "change password" in (await response.text()).lower()
+        ):
+            raise MashovPasswordChangeRequiredError(
+                "Please change password before authenticating.", self.login_page_url
+            )
+        raise MashovError(f"Mashov rejected the answer (HTTP {response.status})")
 
     # Normalizers: map Mashov's camelCase (sometimes lowercase) API fields to the
     # snake_case keys the sensors use. They never raise; a malformed payload

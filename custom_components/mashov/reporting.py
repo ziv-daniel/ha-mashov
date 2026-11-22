@@ -71,6 +71,7 @@ _SOURCE_FILES = {
     "config_flow.py",
     "holidays_utils.py",
     "mailbox.py",
+    "school_activities.py",
     "data_selection.py",
 }
 
@@ -168,6 +169,10 @@ def diagnostic_summary(coordinator=None, technical_logs=None):
             key: mailbox.get(key) if mailbox.get(key) in _STATUSES else "other_error"
             for key in ("status", "counts_status")
         }
+    activities = data.get("school_activities")
+    if isinstance(activities, dict):
+        status = activities.get("status")
+        result["school_activities_status"] = status if status in _STATUSES else "other_error"
     return result
 
 

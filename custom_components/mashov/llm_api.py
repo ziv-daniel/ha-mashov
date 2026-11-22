@@ -101,7 +101,7 @@ class MashovReadTool(MashovTool):
 
     name = "mashov__read"
     description = (
-        "Read a selected Mashov dataset. student_id is required except for holidays/mailbox. "
+        "Read a selected Mashov dataset. student_id is required except for holidays/mailbox/school_activities. "
         "Returns source status, freshness and pagination. No portal requests or write operations."
     )
     parameters = schema.Schema(
@@ -126,8 +126,8 @@ class MashovReadTool(MashovTool):
             items = data.get(key, [])
             status = data.get("holidays_status", "unknown")
             updated = data.get("holidays_last_update")
-        elif key == "mailbox":
-            resource = data.get("mailbox", {})
+        elif key in ("mailbox", "school_activities"):
+            resource = data.get(key, {})
             items, status, updated = (
                 resource.get("items", []),
                 resource.get("status", "unknown"),

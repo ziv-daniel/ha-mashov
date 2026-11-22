@@ -40,11 +40,12 @@ YAML overrides the shared UI schedule. Separate student/data schedules remain in
 
 ## 🧩 Features
 
-- All **18 data types** are selectable; only enabled categories are fetched. Multiple hubs and students are supported without mixing their records.
+- All **19 data types** are selectable; only enabled categories are fetched. Multiple hubs and students are supported without mixing their records.
 - **Student-specific General and per-data schedules:** daily, weekly or interval, edited inside Setup/Configure. One Submit saves all drafts.
 - **One refresh queue** across hubs, including scheduled, manual and startup requests. Selective refreshes preserve other students’ values and timestamps.
 - **Sensors and holiday calendars**, with structured records, formatted summaries, actual update times, source status and stale-data indicators.
 - **Opt-in account mailbox:** unread count and recent headers, with separately consented plain-text content. No attachment downloads.
+- **Parent approvals for school activities:** pending count and activity list; answering from Home Assistant is a separate, admin-only opt-in.
 - **Cache and session persistence**, retry/backoff for unavailable sources, automatic school-year rollover and cleanup of departed students after a verified roster refresh.
 - **English, Hebrew, Arabic, Russian and Ukrainian** UI labels; Hebrew/Arabic schedule editing supports right-to-left layout.
 - **Mashov Live dashboard**, individual Lovelace cards and three announcement/reminder blueprints; see the linked guides below.
@@ -59,6 +60,8 @@ Open **Settings → Devices & services → Mashov → Configure** beside the hub
 | Homework date window | 7 days back, 21 days forward; a request window, not a history-deletion policy |
 | Shared refresh | Daily at 14:00, in Home Assistant’s timezone |
 | Recent mailbox conversations | 20; range 1–50 |
+| Recent school activities | 20; range 1–50; ended activities hidden, answered shown, newest first |
+| Allow actions in Mashov | Off; needed only for `mashov.answer_school_activity` |
 | Items in sensor attributes | 100; range 10–500, further reduced to fit the attribute-size budget |
 | API base | `https://web.mashov.info/api/` |
 | Automatic school year | Enabled unless the account has a pinned year |
@@ -87,8 +90,9 @@ Available in **v1.1.0**. New hubs start with nothing selected; upgrades keep exi
 | Student records | Study materials, student files, absence justification requests, individual lessons |
 | School | Noticeboard, holidays and calendar |
 | Mailbox | Unread count and recent headers; message content is optional |
+| School activities | Parent approvals (trips etc.): pending count, answers per student; answering is optional |
 
-The selection applies to all students in the hub. Mailbox belongs to the account; holidays belong to the school. Availability depends on school permissions. File records are listed, not downloaded; this integration does not submit school forms or absence requests.
+The selection applies to all students in the hub. Mailbox belongs to the account; holidays belong to the school. Availability depends on school permissions. File records are listed, not downloaded; this integration does not submit school forms or absence requests. The only exception is answering a school activity approval, which stays off until you enable **Allow actions in Mashov**.
 
 ### Selecting and disabling data
 
@@ -101,6 +105,12 @@ Removing a category clears its active/disk cache **before login**, even if refre
 Select **Mailbox — headers and unread count** for one sensor per account/school hub. Headers do not mark conversations read. **Full message content is off by default; enabling it marks fetched conversations read in Mashov**, even if you never open them. It fetches plain-text bodies only, with no images or attachments. Removing Mailbox resets full-content consent; enabling it again starts with headers only.
 
 The limit applies to recent inbox conversations (20 by default, 1–50). Sent mail, drafts, archives and older inbox pages are not fetched. Long bodies may be shortened in attributes; check `stored_conversations`, `fetched_conversations`, `body_truncated` and `content_status`. Failed counts are not displayed as zero. See [Privacy & Security](#-privacy--security) before enabling access.
+
+### School activities (optional)
+
+Select **School activities — parent approvals** for one hub-level sensor. Its state counts activities that are not answered and whose answer deadline has not passed; `items` lists title, plain-text description, dates, deadline and each student's answer. Fetching is read-only: up to `school_activities_limit` newest activities (20 by default, 1–50), each costing two extra requests per refresh. The portal's list toggles are options: show ended activities (off), hide answered activities (off), newest first (on). They change only what the sensor lists.
+
+**Answering is off by default.** Turn on **Allow actions in Mashov** to let an administrator call [`mashov.answer_school_activity`](docs/services.md#mashovanswer_school_activity). It sends the same request as the portal's answer form, for one student. Activities with extra questions or a passed deadline are refused; answer those in the portal. Removing School activities turns the permission off again.
 
 ### 🧠 Entities (per child)
 

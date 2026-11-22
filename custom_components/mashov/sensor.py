@@ -44,6 +44,7 @@ def _local_timestamp(value: float | None) -> str | None:
 # NOTE: these package imports sit below the helper above for historical reasons; order is harmless.
 from .additional_data import STUDENT_RESOURCES
 from .const import (
+    ACCOUNT_DEVICE_PREFIXES,
     CONF_MAX_ITEMS_IN_ATTRIBUTES,
     CONF_SCHEDULE_DAY,
     CONF_SCHEDULE_DAYS,
@@ -66,7 +67,12 @@ from .const import (
     SENSOR_KEY_WEEKLY_PLAN,
 )
 from .data_schedule import effective_schedule
-from .data_selection import LEGACY_CORE_DATA, enabled_data
+from .data_selection import (
+    CONF_ALLOW_WRITE_ACTIONS,
+    LEGACY_CORE_DATA,
+    SCHOOL_ACTIVITY_DISPLAY_DEFAULTS,
+    enabled_data,
+)
 from .entity import MashovEntity, MashovStudentEntity, sync_selected_entities
 from .holidays_utils import (
     HOLIDAY_DEFAULT_NAME,
@@ -75,6 +81,7 @@ from .holidays_utils import (
     parse_iso_date_to_date,
     parse_iso_date_to_formatted,
 )
+from .school_activities import display_items, is_pending
 
 
 def _async_migrate_list_sensor_unique_ids(hass: HomeAssistant, entry: ConfigEntry) -> None:
@@ -184,7 +191,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                 identifiers = {value for domain, value in device.identifiers if domain == DOMAIN}
                 if (
                     identifiers
-                    and not any(value.startswith(("holidays_", "mailbox_")) for value in identifiers)
+                    and not any(value.startswith(ACCOUNT_DEVICE_PREFIXES) for value in identifiers)
                     and identifiers.isdisjoint(active)
                     and not any(
                         entity.config_entry_id == entry.entry_id
@@ -228,6 +235,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         async_add_entities([MashovHolidaysSensor(coord, entry.entry_id)])
     if "mailbox" in selected:
         async_add_entities([MashovMailboxSensor(coord, entry.entry_id)])
+    if "school_activities" in selected:
+        async_add_entities([MashovSchoolActivitiesSensor(coord, entry.entry_id)])
     entry.async_on_unload(coord.async_add_listener(sync_students))
 
 
@@ -318,6 +327,84 @@ class MashovMailboxSensor(MashovEntity, SensorEntity):
                     attributes["content_truncated"] = True
             attributes["stored_conversations"] = len(attributes["items"])
         return attributes
+
+
+class MashovSchoolActivitiesSensor(MashovEntity, SensorEntity):
+    """Activities still waiting for a parent answer; the list mirrors the portal's toggles."""
+
+    _attr_icon = "mdi:clipboard-check-outline"
+    _attr_translation_key = "school_activities"
+    _unrecorded_attributes = frozenset({"items"})
+
+    def __init__(self, coordinator, entry_id):
+        super().__init__(coordinator)
+        self._entry_id = entry_id
+        self._attr_unique_id = f"mashov_{entry_id}_school_activities"
+
+    @property
+    def _resource(self):
+        return (self.coordinator.data or {}).get("school_activities", {})
+
+    @property
+    def native_value(self):
+        if self._resource.get("status") not in ("ok", "invalid_response"):
+            return None
+        return sum(is_pending(item) for item in self._resource.get("items", []))
+
+    @property
+    def device_info(self):
+        return {
+            "identifiers": {(DOMAIN, f"school_activities_{self._entry_id}")},
+            "name": f"Mashov – {self.coordinator.entry.title} – School activities",
+            "manufacturer": DEVICE_MANUFACTURER,
+            "model": "Mashov School Activities",
+        }
+
+    def _display_options(self):
+        options = getattr(self.coordinator.entry, "options", {})
+        return {key: bool(options.get(key, default)) for key, default in SCHOOL_ACTIVITY_DISPLAY_DEFAULTS.items()}
+
+    def _listed_items(self, display):
+        return display_items(
+            self._resource.get("items", []),
+            show_ended=display["school_activities_show_ended"],
+            hide_answered=display["school_activities_hide_answered"],
+            newest_first=display["school_activities_newest_first"],
+            today=dt_util.now().date(),
+        )
+
+    @property
+    def extra_state_attributes(self):
+        resource = self._resource
+        display = self._display_options()
+        attributes = {
+            "source_status": resource.get("status", "not_fetched"),
+            "data_stale": self.data_stale or resource.get("status") != "ok",
+            "fetched_activities": len(resource.get("items", [])),
+            "stored_activities": 0,
+            "items": [],
+            "allow_write_actions": bool(
+                getattr(self.coordinator.entry, "options", {}).get(CONF_ALLOW_WRITE_ACTIONS, False)
+            ),
+            "last_update": _local_timestamp(
+                resource.get("last_update", getattr(self.coordinator, "last_successful_update", None))
+            ),
+            **display,
+            **self.schedule_attributes("school_activities"),
+        }
+        return _append_bounded(attributes, self._listed_items(display), "stored_activities")
+
+
+def _append_bounded(attributes, items, count_key, limit_bytes=14 * 1024):
+    """Add items while the whole attribute object stays within the recorder budget."""
+    for item in items:
+        attributes["items"].append(item)
+        if len(json_bytes(attributes)) > limit_bytes:
+            attributes["items"].pop()
+            attributes["items_truncated"] = True
+            break
+    attributes[count_key] = len(attributes["items"])
+    return attributes
 
 
 def _student_meta(data: dict, student_id, fallback_slug: str) -> dict:

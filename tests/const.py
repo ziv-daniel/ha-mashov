@@ -68,3 +68,51 @@ TEST_HOLIDAYS = [
         "name": "Test Holiday",
     }
 ]
+
+# --- School activities (parent approvals); shapes captured from the live portal, values synthetic ---
+ACTIVITY_STUDENT = "11111111-0000-0000-0000-000000000001"
+ACTIVITY_OTHER_STUDENT = "11111111-0000-0000-0000-000000000002"
+ACTIVITY_PARENT = "22222222-0000-0000-0000-000000000001"
+ACTIVITY_TODAY = "2026-11-23"
+PERMITTED_ACTIVITIES = [
+    {
+        "id": 12,
+        "createTime": "2026-11-16T09:00:00",
+        "activityStartDate": "2026-11-25T00:00:00",
+        "activityEndDate": "2026-11-25T00:00:00",
+        "activityType": 1,
+        "creatorGuid": "33333333-0000-0000-0000-000000000001",
+        "title": "Class trip",
+        "description": "<p>Bring water</p><script>x()</script>",
+        "endAnswerDate": "2026-11-24T00:00:00",
+        "isAnswered": False,
+    },
+    {
+        "id": 7,
+        "createTime": "2026-11-01T09:00:00",
+        "activityStartDate": "2026-11-05T00:00:00",
+        "activityEndDate": "2026-11-05T00:00:00",
+        "activityType": 1,
+        "creatorGuid": "33333333-0000-0000-0000-000000000001",
+        "title": "Museum",
+        "description": "Old",
+        "endAnswerDate": "2026-11-04T00:00:00",
+        "isAnswered": True,
+    },
+]
+ACTIVITY_USER_ANSWERS = [
+    {
+        "userId": ACTIVITY_STUDENT,
+        "schoolActivityAnswer": {
+            "activityId": 12,
+            "answer": 1,
+            "answerTime": "2026-11-17T08:00:00",
+            "manuallyAnswered": False,
+            "studentGuid": ACTIVITY_STUDENT,
+            "userId": ACTIVITY_PARENT,
+        },
+    },
+    {"userId": ACTIVITY_OTHER_STUDENT},
+]
+ACTIVITY_DETAIL_SIMPLE = [{**PERMITTED_ACTIVITIES[0], "activityData": None}]
+ACTIVITY_DETAIL_QUESTIONS = [{**PERMITTED_ACTIVITIES[0], "activityData": '{"questions": [{"q": "Allergies?"}]}'}]

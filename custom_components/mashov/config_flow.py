@@ -59,19 +59,33 @@ from .const import (
 )
 from .data_schedule import CONF_DATA_SCHEDULES, CONF_EDIT_DATA_SCHEDULES, CONF_STUDENT_SCHEDULES, SCHEDULE_SCHEMA
 from .data_selection import (
+    CONF_ALLOW_WRITE_ACTIONS,
     CONF_ENABLED_DATA,
     CONF_MAILBOX_FULL_CONTENT,
     CONF_MAILBOX_LIMIT,
+    CONF_SCHOOL_ACTIVITIES_LIMIT,
     DATA_KEYS,
     DEFAULT_MAILBOX_LIMIT,
+    DEFAULT_SCHOOL_ACTIVITIES_LIMIT,
+    SCHOOL_ACTIVITY_DISPLAY_DEFAULTS,
     enabled_data,
     merge_selection_options,
 )
 from .mashov_client import MashovAuthError, MashovClient, MashovError
 from .schedule_flow import DataScheduleFlow, schedule_fields
 
+# Options shown with the data selection; values come from the submitted form or stored options.
+SELECTION_OPTION_KEYS = (
+    CONF_ENABLED_DATA,
+    CONF_MAILBOX_FULL_CONTENT,
+    CONF_MAILBOX_LIMIT,
+    CONF_SCHOOL_ACTIVITIES_LIMIT,
+    *SCHOOL_ACTIVITY_DISPLAY_DEFAULTS,
+    CONF_ALLOW_WRITE_ACTIONS,
+)
 
-def _data_fields(selected, full_content=False, limit=DEFAULT_MAILBOX_LIMIT):
+
+def _data_fields(selected, options):
     """Shared explicit choices for new hubs and existing hubs' Configure form."""
     return {
         vol.Optional(CONF_ENABLED_DATA, default=list(selected)): SelectSelector(
@@ -79,9 +93,30 @@ def _data_fields(selected, full_content=False, limit=DEFAULT_MAILBOX_LIMIT):
                 options=list(DATA_KEYS), multiple=True, mode=SelectSelectorMode.DROPDOWN, translation_key="enabled_data"
             )
         ),
-        vol.Optional(CONF_MAILBOX_FULL_CONTENT, default=full_content): bool,
-        vol.Optional(CONF_MAILBOX_LIMIT, default=limit): vol.All(int, vol.Range(min=1, max=50)),
+        vol.Optional(CONF_MAILBOX_FULL_CONTENT, default=options.get(CONF_MAILBOX_FULL_CONTENT, False)): bool,
+        vol.Optional(CONF_MAILBOX_LIMIT, default=options.get(CONF_MAILBOX_LIMIT, DEFAULT_MAILBOX_LIMIT)): vol.All(
+            int, vol.Range(min=1, max=50)
+        ),
+        vol.Optional(
+            CONF_SCHOOL_ACTIVITIES_LIMIT,
+            default=options.get(CONF_SCHOOL_ACTIVITIES_LIMIT, DEFAULT_SCHOOL_ACTIVITIES_LIMIT),
+        ): vol.All(int, vol.Range(min=1, max=50)),
+        **{
+            vol.Optional(key, default=options.get(key, default)): bool
+            for key, default in SCHOOL_ACTIVITY_DISPLAY_DEFAULTS.items()
+        },
+        vol.Optional(CONF_ALLOW_WRITE_ACTIONS, default=options.get(CONF_ALLOW_WRITE_ACTIONS, False)): bool,
     }
+
+
+def _requirement_errors(user_input, selected):
+    """Opt-ins that depend on a selected data source."""
+    errors = {}
+    if user_input.get(CONF_MAILBOX_FULL_CONTENT) and "mailbox" not in selected:
+        errors[CONF_MAILBOX_FULL_CONTENT] = "mailbox_required"
+    if user_input.get(CONF_ALLOW_WRITE_ACTIONS) and "school_activities" not in selected:
+        errors[CONF_ALLOW_WRITE_ACTIONS] = "school_activities_required"
+    return errors
 
 
 class ConfigFlow(DataScheduleFlow, config_entries.ConfigFlow, domain=DOMAIN):
@@ -176,13 +211,7 @@ class ConfigFlow(DataScheduleFlow, config_entries.ConfigFlow, domain=DOMAIN):
         # Credentials discover the account's students; only selected data is fetched.
         submitted = user_input or {}
         self._inline_schedule_options = submitted
-        schema = schema.extend(
-            _data_fields(
-                submitted.get(CONF_ENABLED_DATA, []),
-                submitted.get(CONF_MAILBOX_FULL_CONTENT, False),
-                submitted.get(CONF_MAILBOX_LIMIT, DEFAULT_MAILBOX_LIMIT),
-            )
-        )
+        schema = schema.extend(_data_fields(submitted.get(CONF_ENABLED_DATA, []), submitted))
 
         schema = schema.extend(
             {**schedule_fields(submitted), vol.Optional(CONF_EDIT_DATA_SCHEDULES, default=False): bool}
@@ -205,8 +234,8 @@ class ConfigFlow(DataScheduleFlow, config_entries.ConfigFlow, domain=DOMAIN):
                     errors=errors,
                     description_placeholders={"schedule_summary": await self._schedule_summary(submitted)},
                 )
-            if user_input.get(CONF_MAILBOX_FULL_CONTENT) and "mailbox" not in user_input.get(CONF_ENABLED_DATA, []):
-                errors[CONF_MAILBOX_FULL_CONTENT] = "mailbox_required"
+            errors = _requirement_errors(user_input, user_input.get(CONF_ENABLED_DATA, []))
+            if errors:
                 return self.async_show_form(
                     step_id="user",
                     data_schema=schema,
@@ -340,9 +369,7 @@ class ConfigFlow(DataScheduleFlow, config_entries.ConfigFlow, domain=DOMAIN):
                 selection = {
                     key: user_input.pop(key)
                     for key in (
-                        CONF_ENABLED_DATA,
-                        CONF_MAILBOX_FULL_CONTENT,
-                        CONF_MAILBOX_LIMIT,
+                        *SELECTION_OPTION_KEYS,
                         CONF_SCHEDULE_TYPE,
                         CONF_SCHEDULE_TIME,
                         CONF_SCHEDULE_DAYS,
@@ -452,15 +479,17 @@ class OptionsFlowHandler(DataScheduleFlow, config_entries.OptionsFlow):
         )
         if user_input is not None:
             errors = {}
-            if user_input.get(CONF_MAILBOX_FULL_CONTENT) and "mailbox" not in user_input.get(
-                CONF_ENABLED_DATA, enabled_data(self.config_entry.options)
+            previous = enabled_data(self.config_entry.options)
+            selected = user_input.get(CONF_ENABLED_DATA, previous)
+            # Removing a source takes precedence over its old checked opt-in.
+            # Re-enabling it starts without that consent.
+            for source, consent in (
+                ("mailbox", CONF_MAILBOX_FULL_CONTENT),
+                ("school_activities", CONF_ALLOW_WRITE_ACTIONS),
             ):
-                if "mailbox" in enabled_data(self.config_entry.options):
-                    # Removing mailbox takes precedence over its old checked
-                    # full-content box. Re-enabling starts with no read consent.
-                    user_input = {**user_input, CONF_MAILBOX_FULL_CONTENT: False}
-                else:
-                    errors[CONF_MAILBOX_FULL_CONTENT] = "mailbox_required"
+                if source in previous and source not in selected:
+                    user_input = {**user_input, consent: False}
+            errors = _requirement_errors(user_input, selected)
             # Validate schedule_time format if present
             import re
 
@@ -566,11 +595,7 @@ class OptionsFlowHandler(DataScheduleFlow, config_entries.OptionsFlow):
                     "automatic_school_year",
                     default=current_options.get("automatic_school_year", not self.config_entry.data.get(CONF_YEAR)),
                 ): bool,
-                **_data_fields(
-                    enabled_data(current_options),
-                    current_options.get(CONF_MAILBOX_FULL_CONTENT, False),
-                    current_options.get(CONF_MAILBOX_LIMIT, DEFAULT_MAILBOX_LIMIT),
-                ),
+                **_data_fields(enabled_data(current_options), current_options),
                 # Never prefilled with the stored password; leave empty to keep it.
                 vol.Optional(CONF_PASSWORD, description={"suggested_value": ""}): str,
                 vol.Optional(CONF_HOMEWORK_DAYS_BACK, default=options[CONF_HOMEWORK_DAYS_BACK]): vol.All(

@@ -8,11 +8,21 @@ CONF_ENABLED_DATA = "enabled_data"
 CONF_MAILBOX_FULL_CONTENT = "mailbox_full_content"
 CONF_MAILBOX_LIMIT = "mailbox_limit"
 DEFAULT_MAILBOX_LIMIT = 20
+CONF_SCHOOL_ACTIVITIES_LIMIT = "school_activities_limit"
+DEFAULT_SCHOOL_ACTIVITIES_LIMIT = 20
+# Display toggles mirroring the portal's activity list; defaults match the portal.
+SCHOOL_ACTIVITY_DISPLAY_DEFAULTS = {
+    "school_activities_show_ended": False,
+    "school_activities_hide_answered": False,
+    "school_activities_newest_first": True,
+}
+# The only option that lets this integration change data at Mashov (activity answers).
+CONF_ALLOW_WRITE_ACTIONS = "allow_write_actions"
 
 # Frozen historical default, including installations from v1.0.7. Never extend
 # this tuple when adding a resource: upgrades must not enable new data sources.
 LEGACY_CORE_DATA = ("homework", "behavior", "weekly_plan", "timetable", "lessons_history", "grades", "holidays")
-DATA_KEYS = (*LEGACY_CORE_DATA, *STUDENT_RESOURCES, "mailbox")
+DATA_KEYS = (*LEGACY_CORE_DATA, *STUDENT_RESOURCES, "mailbox", "school_activities")
 
 
 def enabled_data(options):
@@ -38,6 +48,9 @@ def merge_selection_options(current, changes):
     # it later must not silently reuse an old full-content opt-in.
     if "mailbox" not in merged[CONF_ENABLED_DATA]:
         merged[CONF_MAILBOX_FULL_CONTENT] = False
+    # The only write action answers school activities; deselecting them revokes it.
+    if "school_activities" not in merged[CONF_ENABLED_DATA]:
+        merged[CONF_ALLOW_WRITE_ACTIONS] = False
     return merged
 
 
@@ -77,6 +90,7 @@ def filter_cached_data(data, options):
         result["holidays_status"] = "disabled"
         result.pop("holidays_cached", None)
         result.pop("holidays_last_update", None)
+    _filter_school_activities(result, selected, options)
     if "mailbox" not in selected:
         result.pop("mailbox", None)
     else:
@@ -92,3 +106,12 @@ def filter_cached_data(data, options):
                 for message in conversation.get("messages", []):
                     message.pop("body", None)
     return result
+
+
+def _filter_school_activities(result, selected, options):
+    if "school_activities" not in selected:
+        result.pop("school_activities", None)
+    elif "items" in result.get("school_activities", {}):
+        limit = options.get(CONF_SCHOOL_ACTIVITIES_LIMIT, DEFAULT_SCHOOL_ACTIVITIES_LIMIT)
+        result["school_activities"]["items"] = result["school_activities"]["items"][:limit]
+        result["school_activities"]["limit"] = limit

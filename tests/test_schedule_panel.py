@@ -6,6 +6,7 @@ from homeassistant.exceptions import Unauthorized
 import pytest
 import voluptuous as vol
 
+from custom_components.mashov.data_selection import DATA_KEYS
 from custom_components.mashov.mashov_client import MashovAuthError
 from custom_components.mashov.schedule_panel import (
     HubRegistrationView,
@@ -160,7 +161,7 @@ async def test_registration_and_editor_share_complete_translations(hass, mock_co
     assert payload["ui"] == expected
     assert payload["ui"]["username"] == source["config"]["step"]["user"]["data"]["username"]
     assert payload["ui"]["password"] == source["config"]["step"]["user"]["data"]["password"]
-    assert len(payload["datasets"]) == 18
+    assert len(payload["datasets"]) == len(DATA_KEYS)
     assert "test_password" not in json.dumps(payload)
 
 
